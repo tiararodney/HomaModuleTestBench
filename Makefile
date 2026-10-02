@@ -105,9 +105,8 @@ $(UNIT_LOGS): test-report/unit/%/$(BRANCH).log: $(HOMA_SRC) $(TEST_SRC) \
 	rm -f $(BDIR)/test/mock.c
 	cat $(HOMA)/test/mock.c unit-mock-compat.c > $(BDIR)/test/mock.c
 	$(MAKE) -C $(BDIR)/test KDIR=$(CURDIR)/kernels/linux-$*-unit -j$(NPROC) unit
-	cd $(BDIR)/test && ./unit > $(CURDIR)/$@.part 2>&1
-	! grep -q '^\[  FAILED  \]' $@.part
-	mv $@.part $@
+	cd $(BDIR)/test && ./unit > $(CURDIR)/$@ 2>&1
+	! grep -q '^\[  FAILED  \]' $@
 
 SKELETON := $(shell find initramfs.d -type f)
 $(INITRDS): build/%/$(BRANCH)/initramfs.gz: build/%/$(BRANCH)/homa.ko \
@@ -132,9 +131,8 @@ $(SMOKE_LOGS): test-report/smoke/%/$(BRANCH).log: \
 		-kernel kernels/linux-$*/arch/x86/boot/bzImage \
 		-initrd $(BDIR)/initramfs.gz \
 		-append "console=ttyS0 panic=-1" \
-		< /dev/null > $@.part 2>&1
-	grep -q '^HOMA_VM_SMOKE: PASS' $@.part
-	mv $@.part $@
+		< /dev/null > $@ 2>&1
+	grep -q '^HOMA_VM_SMOKE: PASS' $@
 
 .clean:
 	rm -rv autom4te.cache config.status config.log

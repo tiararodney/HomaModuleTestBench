@@ -1,0 +1,8 @@
+/kernels/
+/build/
+/test-report/
+/.cache/
+/autom4te.cache/
+/configure~
+*.swp
+*.swo

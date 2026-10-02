@@ -1,0 +1,24 @@
+# kernel config for the unit tests, applied on top of 'make defconfig'
+# (NOT tinyconfig) and resolved by olddefconfig.
+#
+# The unit harness compiles the module sources plus test/mock.c against
+# these headers. mock.c provides its own definitions of kernel functions
+# (consume_skb, __rcu_read_lock, security_sk_classify_flow, ...) so the
+# test binary can intercept them -- but those are extern symbols only
+# under a feature-rich config; a minimal config makes them 'static
+# inline', which cannot be overridden (redefinition error). defconfig is
+# that feature-rich config: it provides every symbol mock.c overrides and
+# every struct member Homa reads, EXCEPT MEMCG. So defconfig + MEMCG is
+# all the unit side needs; this mirrors upstream, whose test/Makefile
+# defaults KDIR to the running distro kernel.
+
+# defconfig leaves MEMCG off; homa_rpc.c reads sock.sk_memcg (see the
+# same note in kernel.smokeconfig).
+CONFIG_CGROUPS=y
+CONFIG_MEMCG=y
+
+# Keep defconfig's NUMA on: mock_cpu_to_node() returns node 0 or 1, so
+# MAX_NUMNODES must be >= 2 for homa_tx_pool_init()'s
+# BUG_ON(numa >= MAX_NUMNODES). NUMA on gives NODES_SHIFT=6
+# (MAX_NUMNODES=64) AND keeps x86's cpu_to_node a macro, which is what
+# lets mock.h redirect it to mock_cpu_to_node. (NUMA off breaks both.)

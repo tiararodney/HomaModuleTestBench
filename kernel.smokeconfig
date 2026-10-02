@@ -1,0 +1,58 @@
+# kernel config, applied on top of 'make tinyconfig' and resolved by
+# olddefconfig. tinyconfig is the kernel's canonical minimum, so unlike
+# defconfig it does not drift between kernel versions.
+#
+# this file is the complete, explicit statement of the underlying config of the
+# kernels used for the module build and smoke testing. olddefconfig silently
+# drops options whose dependencies are unmet, so every dependency is listed
+# explicitly. Only what the MODULE and the VM need lives here; symbols that
+# only the unit tests touch belong in kernel.unitconfig.
+
+# After changing this file, check the resolved kernels/linux-*/.config for what
+# survived.
+
+# Base machine (tinyconfig defaults to 32-bit, no SMP)
+CONFIG_64BIT=y
+CONFIG_SMP=y
+CONFIG_PRINTK=y
+CONFIG_MULTIUSER=y
+
+# Module support, for homa.ko itself
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+
+# Networking that Homa needs
+CONFIG_NET=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+
+# Homa touches sock.sk_memcg, which only exists under CONFIG_MEMCG.  defconfig
+# left it off... Every deployment kernel has it on, so its on here too...
+CONFIG_CGROUPS=y
+CONFIG_MEMCG=y
+
+# Homa reads sock.sk_policy (homa_peer.h:530), which only exists under
+# CONFIG_XFRM. XFRM is promptless, so olddefconfig cannot set it directly.
+# XFRM_USER is its canonical user-visible selector (pulls in XFRM_ALGO and the
+# crypto core).
+CONFIG_XFRM_USER=y
+
+# homa_qdisc.c registers a qdisc. register_qdisc/unregister_qdisc are exported
+# under CONFIG_NET_SCHED.
+CONFIG_NET_SCHED=y
+
+# actual smoke-test VM requirements: gzipped initramfs, ELF busybox, /proc and
+# /sys for vm/init, sysctl so /proc/sys/net/homa appears, serial console. This
+# took me a couple of iterations...
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_RD_GZIP=y
+CONFIG_BINFMT_ELF=y
+# vm/init is a #! script; shebang execution is its own binfmt. 
+CONFIG_BINFMT_SCRIPT=y
+CONFIG_PROC_FS=y
+CONFIG_SYSFS=y
+CONFIG_SYSCTL=y
+CONFIG_PROC_SYSCTL=y
+CONFIG_TTY=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y

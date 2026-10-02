@@ -1,0 +1,15 @@
+# Vanilla kernel.org versions used, one per line.
+# 
+# Pin EXACT point releases so runs are reproducible and bump deliberately!
+#
+# Browse https://cdn.kernel.org/pub/linux/kernel, to find available kernel
+# archives.
+#
+6.10.6
+6.13.9
+6.15.11
+6.17.13
+6.19.14
+7.0.14
+# Current LTS
+# 6.18.54

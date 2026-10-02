@@ -13,3 +13,68 @@ Modules:
           Path: ./
         - Name: Module
           Path: ./HomaModule.git/
+
+--ISSUE
+Content-Type: application/issue
+ID: 1
+Type: feature
+Title: Stub preempt_schedule_thunk in test/mock.c so unit tests link against vanilla kernels
+Status: open
+Priority: medium
+Created: 2026-10-02
+Module: Module
+Relationships: 
+Description: PROPOSAL — make the unit tests linkable against clean vanilla
+             kernel.org trees, not only the running distro kernel.
+             
+             ## Problem
+             `test/unit` links cleanly when KDIR points at a distro kernel (the
+             test/Makefile default, /lib/modules/$(uname -r)/build) but FAILS to
+             link against a clean vanilla kernel.org tree. Against vanilla
+             x86_64 (defconfig):
+             
+             ld: undefined reference to `preempt_schedule_thunk'
+             (also `preempt_schedule_notrace_thunk')
+             
+             referenced from the inlined preempt_enable() in <linux/rcupdate.h>,
+             <linux/bit_spinlock.h>, <linux/rhashtable.h> — i.e. from
+             homa_peer.o, rhashtable.o, unit_homa_peer.o.
+             
+             ## Root cause
+             With CONFIG_HAVE_STATIC_CALL_INLINE=y (set on vanilla x86
+             defconfig), the static-call machinery pins each static call's
+             *default target* as an addressable symbol. For `preempt_schedule`
+             that default target is `preempt_schedule_thunk`
+             (arch/x86/entry/thunk.S). mock.c already stubs the trampoline
+             `__SCT__preempt_schedule`, but not the underlying thunk, so the
+             reference is unresolved. Distro kernels don't surface it
+             identically, so the gap is invisible when building against the
+             running kernel.
+             
+             ## Proposed change
+             Add two no-op stubs to test/mock.c, next to the existing
+             `__SCT__preempt_schedule` stub:
+             
+             void preempt_schedule_thunk(void) {}
+             void preempt_schedule_notrace_thunk(void) {}
+             
+             They are no-ops in the userspace harness, consistent with the
+             trampoline stub already there.
+             
+             ## Benefit
+             Lets the unit tests build and run against arbitrary vanilla
+             kernel.org trees, which enables per-kernel-version compatibility
+             testing. Removes the need for a downstream shim: an out-of-tree
+             test battery currently concatenates exactly these two stubs onto
+             its own copy of mock.c (unit-mock-compat.c) to work around this.
+             
+             ## Acceptance
+             `make -C test KDIR=<vanilla defconfig tree>` builds and runs `unit`
+             with no external shim and no undefined-symbol link errors.
+             
+             ## Out of scope (context only)
+             Running against vanilla also requires the kernel configured with
+             NUMA on, so MAX_NUMNODES >= 2 (mock_cpu_to_node() returns node 0/1
+             and homa_tx_pool_init() BUG_ON()s otherwise) and so x86 keeps
+             cpu_to_node a macro that mock.h's redirect catches. That is a
+             config choice on the consumer side, not a mock.c change.

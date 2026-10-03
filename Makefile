@@ -91,13 +91,14 @@ $(MODULES): build/%/$(BRANCH)/homa.ko: $(HOMA_SRC) \
 $(UNIT_LOGS): test-report/unit/%/$(BRANCH).log: $(HOMA_SRC) $(TEST_SRC) \
 		unit-mock-compat.c \
 		kernels/linux-%-unit/include/generated/autoconf.h
-	# Rebuild the test objects from scratch: the copied test/Makefile's
-	# dep tracking misses the force-included autoconf.h, so reusing the
-	# dir across a config change would relink stale objects. Safe to
-	# clean unconditionally - make only runs this recipe when a prereq
-	# (sources or autoconf.h) actually changed.
-	rm -rf $(BDIR)/test
 	mkdir -p $(@D) $(BDIR)/test
+	# The copied test/Makefile does not track the force-included
+	# autoconf.h, so wipe objects only when the kernel CONFIG changed
+	# under them (autoconf.h newer than the last-built unit binary).
+	# Source edits are handled incrementally by the sub-make's own -MD
+	# dep tracking, so the common case is a cheap partial rebuild.
+	if [ kernels/linux-$*-unit/include/generated/autoconf.h -nt \
+			$(BDIR)/test/unit ]; then rm -f $(BDIR)/test/*.o; fi
 	cp -alf -t $(BDIR) $(HOMA_SRC)
 	cp -alf -t $(BDIR)/test $(TEST_SRC)
 	# Overlay the vanilla-compat shim onto our copy of mock.c; rm first
@@ -142,4 +143,34 @@ $(SMOKE_LOGS): test-report/smoke/%/$(BRANCH).log: \
 	| sed -n -e '/^$$/ { n ; /^[^ .#][^ ]*:/ { s/:.*$$// ; p ; } ; }' \
 	| sort
 
-.PHONY: .clean .list
+# Print a DOT dependency graph of this Makefile's rules.
+#   make .graph | dot -Tsvg > graph.svg
+#   make .graph | dot -Tpng > graph.png
+.graph:
+	@awk '                                                            \
+	/\\$$/ { sub(/\\$$/, ""); buf = buf $$0 " "; next }              \
+	buf   { $$0 = buf $$0; buf = "" }                                \
+	/^[#\t]/ || /^$$/ || /^\./ || /[:+?!]?=/ { next }               \
+	/:/ {                                                            \
+	  n = split($$0, P, ":");                                        \
+	  if (n >= 3) { tgt = P[2]; dep = P[3] }                        \
+	  else        { tgt = P[1]; dep = P[2] }                        \
+	  for (i = (n>=3?4:3); i <= n; i++) dep = dep ":" P[i];         \
+	  gsub(/^ +| +$$/, "", tgt);                                    \
+	  m = split(dep, D, " ");                                       \
+	  for (i = 1; i <= m; i++) {                                    \
+	    gsub(/^ +| +$$/, "", D[i]);                                 \
+	    if (D[i] != "" && D[i] != "|") {                            \
+	      edge = D[i] "\t" tgt;                                     \
+	      if (!seen[edge]++) printf "%s\n", edge                    \
+	    }                                                           \
+	  }                                                             \
+	}' Makefile                                                      \
+	| awk -F'\t' '                                                   \
+	  BEGIN { print "digraph make {";                                \
+	          print "  rankdir=LR;";                                 \
+	          print "  node [shape=box, fontsize=10];" }             \
+	  { printf "  \"%s\" -> \"%s\";\n", $$1, $$2 }                  \
+	  END   { print "}" }'
+
+.PHONY: .clean .list .graph

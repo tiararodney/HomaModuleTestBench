@@ -1,15 +1,9 @@
 #!/bin/busybox sh
-# Init for the battery's VM smoke test. Loads homa.ko, sanity-checks it,
-# unloads it, and reports one sentinel line that battery.sh greps for:
-#   HOMA_VM_SMOKE: PASS   or   HOMA_VM_SMOKE: FAIL (<step>)
-# Always resets the VM at the end; QEMU runs with -no-reboot, which
-# turns the reset into a QEMU exit (tinyconfig has no ACPI poweroff).
-
 /bin/busybox --install -s /bin
 export PATH=/bin
 
 fail() {
-    echo "HOMA_VM_SMOKE: FAIL ($1)"
+    echo "SMOKE: FAIL ($1)"
     reboot -f
 }
 
@@ -21,12 +15,12 @@ echo "homa smoke test on $(uname -r)"
 insmod /homa.ko || fail insmod
 grep -q '^homa ' /proc/modules || fail not-in-proc-modules
 
-# The module registers its sysctls when it loads; their absence means it
-# did not initialize properly even if insmod returned 0.
+# module registers sysctls when it loads, if they're missing it didn't
+# initialize properly, regardless of what insmod reports...
 [ -d /proc/sys/net/homa ] || fail no-sysctls
 
 rmmod homa || fail rmmod
 grep -q '^homa ' /proc/modules && fail still-loaded-after-rmmod
 
-echo "HOMA_VM_SMOKE: PASS"
+echo "SMOKE: PASS"
 reboot -f

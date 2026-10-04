@@ -6,21 +6,16 @@ KORG := https://cdn.kernel.org/pub/linux/kernel
 HOMA := HomaModule.git
 HOMA_SRC := $(wildcard $(HOMA)/*.c) $(wildcard $(HOMA)/*.h) $(HOMA)/Makefile
 TEST_SRC := $(wildcard $(HOMA)/test/*.c $(HOMA)/test/*.cc $(HOMA)/test/*.h) \
-	    $(HOMA)/test/Makefile $(HOMA)/test/mergedep.pl
+            $(HOMA)/test/Makefile $(HOMA)/test/mergedep.pl
 
 BRANCH := $(shell git -C $(HOMA) symbolic-ref -q --short HEAD \
 		|| git -C $(HOMA) rev-parse --short HEAD)
-# per-version, per-branch module build directory (recipes only).
+# per-version, per-branch module build directory
 BDIR = build/$*/$(BRANCH)
 
-# Two trees per version from the same tarball: linux-% is the minimal
-# (tinyconfig + kernel.smokeconfig) tree the module and the VM boot from;
-# linux-%-unit is the defconfig + kernel.unitconfig tree the unit harness
-# compiles against (its mock layer needs defconfig's extern symbols, not
-# tinyconfig's static inlines).
 TARBALLS := $(KERNELS:%=$(KDLCACHEDIR)/linux-%.tar.xz)
-TREES := $(KERNELS:%=kernels/linux-%)
-UNIT_TREES := $(KERNELS:%=kernels/linux-%-unit)
+TREES := $(KERNELS:%=kernels/linux-%/)
+UNIT_TREES := $(KERNELS:%=kernels/linux-%-unit/)
 CONFIGS := $(KERNELS:%=kernels/linux-%/.config)
 UNIT_CONFIGS := $(KERNELS:%=kernels/linux-%-unit/.config)
 PREPARED := $(KERNELS:%=kernels/linux-%/include/generated/autoconf.h)
@@ -33,12 +28,12 @@ INITRDS := $(KERNELS:%=build/%/$(BRANCH)/initramfs.gz)
 SMOKE_LOGS := $(KERNELS:%=test-report/smoke/%/$(BRANCH).log)
 
 BUSYBOX := /usr/bin/busybox
-# KVM when available; QEMU falls back to TCG (slower boot) without it.
+# KVM when available; QEMU falls back to TCG without it...
 QEMU_KVM := $(shell test -w /dev/kvm && echo -enable-kvm -cpu host)
 
 NPROC := $(shell nproc)
 
-# v6.x/v7.x directory on kernel.org, derived from the version stem.
+# v6.x/v7.x directory on kernel.org, derived from the version stem
 series = v$(firstword $(subst ., ,$(1))).x
 
 $(TARBALLS): $(KDLCACHEDIR)/linux-%.tar.xz:
@@ -48,19 +43,19 @@ $(TARBALLS): $(KDLCACHEDIR)/linux-%.tar.xz:
 
 # -m: stamp extracted files with the current time instead of the archive
 # mtimes, which predate the tarball and would make the tree look stale...
-$(TREES): kernels/linux-%: $(KDLCACHEDIR)/linux-%.tar.xz
+$(TREES): kernels/linux-%/: $(KDLCACHEDIR)/linux-%.tar.xz
 	tar -C kernels -m -xf $<
 
-$(UNIT_TREES): kernels/linux-%-unit: $(KDLCACHEDIR)/linux-%.tar.xz
+$(UNIT_TREES): kernels/linux-%-unit/: $(KDLCACHEDIR)/linux-%.tar.xz
 	mkdir -p $@
 	tar -C $@ --strip-components=1 -m -xf $<
 
-$(CONFIGS): kernels/linux-%/.config: kernel.smokeconfig | kernels/linux-%
+$(CONFIGS): kernels/linux-%/.config: kernel.smokeconfig | kernels/linux-%/
 	$(MAKE) -C kernels/linux-$* tinyconfig
 	cat kernel.smokeconfig >> $@
 	$(MAKE) -C kernels/linux-$* olddefconfig
 
-$(UNIT_CONFIGS): kernels/linux-%-unit/.config: kernel.unitconfig | kernels/linux-%-unit
+$(UNIT_CONFIGS): kernels/linux-%-unit/.config: kernel.unitconfig | kernels/linux-%-unit/
 	$(MAKE) -C kernels/linux-$*-unit defconfig
 	cat kernel.unitconfig >> $@
 	$(MAKE) -C kernels/linux-$*-unit olddefconfig
@@ -75,9 +70,6 @@ $(UNIT_PREPARED): kernels/linux-%-unit/include/generated/autoconf.h: \
 $(BZIMAGES): kernels/linux-%/arch/x86/boot/bzImage: kernels/linux-%/.config
 	$(MAKE) -C kernels/linux-$* -j$(NPROC) bzImage
 
-# 'make modules' alone compiles no built-in objects; the symbol table
-# is only complete after vmlinux. Deliberately no bzImage here - that
-# is the bzImage rule's job; the two share kbuild's object cache.
 $(SYMVERS): kernels/linux-%/Module.symvers: \
 		kernels/linux-%/include/generated/autoconf.h
 	$(MAKE) -C kernels/linux-$* -j$(NPROC) vmlinux modules
@@ -94,15 +86,12 @@ $(UNIT_LOGS): test-report/unit/%/$(BRANCH).log: $(HOMA_SRC) $(TEST_SRC) \
 	mkdir -p $(@D) $(BDIR)/test
 	# The copied test/Makefile does not track the force-included
 	# autoconf.h, so wipe objects only when the kernel CONFIG changed
-	# under them (autoconf.h newer than the last-built unit binary).
-	# Source edits are handled incrementally by the sub-make's own -MD
-	# dep tracking, so the common case is a cheap partial rebuild.
 	if [ kernels/linux-$*-unit/include/generated/autoconf.h -nt \
 			$(BDIR)/test/unit ]; then rm -f $(BDIR)/test/*.o; fi
 	cp -alf -t $(BDIR) $(HOMA_SRC)
 	cp -alf -t $(BDIR)/test $(TEST_SRC)
 	# Overlay the vanilla-compat shim onto our copy of mock.c; rm first
-	# to break the hardlink so the submodule's mock.c stays untouched.
+	# to break the hardlink so the submodule's mock.c stays untouched
 	rm -f $(BDIR)/test/mock.c
 	cat $(HOMA)/test/mock.c unit-mock-compat.c > $(BDIR)/test/mock.c
 	$(MAKE) -C $(BDIR)/test KDIR=$(CURDIR)/kernels/linux-$*-unit -j$(NPROC) unit
@@ -133,44 +122,17 @@ $(SMOKE_LOGS): test-report/smoke/%/$(BRANCH).log: \
 		-initrd $(BDIR)/initramfs.gz \
 		-append "console=ttyS0 panic=-1" \
 		< /dev/null > $@ 2>&1
-	grep -q '^HOMA_VM_SMOKE: PASS' $@
+	grep -q '^SMOKE: PASS' $@
 
 .clean:
-	rm -rv autom4te.cache config.status config.log
+	rm -rv autom4te.cache/ config.status config.log configure~
+
+.clean-squeaky: .clean
+	rm -rv build/ kernels/ test-report/
 
 .list:
 	@make -rpn \
 	| sed -n -e '/^$$/ { n ; /^[^ .#][^ ]*:/ { s/:.*$$// ; p ; } ; }' \
 	| sort
 
-# Print a DOT dependency graph of this Makefile's rules.
-#   make .graph | dot -Tsvg > graph.svg
-#   make .graph | dot -Tpng > graph.png
-.graph:
-	@awk '                                                            \
-	/\\$$/ { sub(/\\$$/, ""); buf = buf $$0 " "; next }              \
-	buf   { $$0 = buf $$0; buf = "" }                                \
-	/^[#\t]/ || /^$$/ || /^\./ || /[:+?!]?=/ { next }               \
-	/:/ {                                                            \
-	  n = split($$0, P, ":");                                        \
-	  if (n >= 3) { tgt = P[2]; dep = P[3] }                        \
-	  else        { tgt = P[1]; dep = P[2] }                        \
-	  for (i = (n>=3?4:3); i <= n; i++) dep = dep ":" P[i];         \
-	  gsub(/^ +| +$$/, "", tgt);                                    \
-	  m = split(dep, D, " ");                                       \
-	  for (i = 1; i <= m; i++) {                                    \
-	    gsub(/^ +| +$$/, "", D[i]);                                 \
-	    if (D[i] != "" && D[i] != "|") {                            \
-	      edge = D[i] "\t" tgt;                                     \
-	      if (!seen[edge]++) printf "%s\n", edge                    \
-	    }                                                           \
-	  }                                                             \
-	}' Makefile                                                      \
-	| awk -F'\t' '                                                   \
-	  BEGIN { print "digraph make {";                                \
-	          print "  rankdir=LR;";                                 \
-	          print "  node [shape=box, fontsize=10];" }             \
-	  { printf "  \"%s\" -> \"%s\";\n", $$1, $$2 }                  \
-	  END   { print "}" }'
-
-.PHONY: .clean .list .graph
+.PHONY: .clean .clean-squeaky .list

@@ -1,6 +1,4 @@
-# HomaModuleWorkbench
-
-This repository is my personal tiny workbench for quickly evaluating
+This repository is my personal tiny test bench for quickly evaluating
 [HomaModule](https://github.com/PlatformLab/HomaModule) builds against multiple
 Linux vanilla kernel versions through a simple test battery.
 
@@ -8,12 +6,10 @@ The interface is for compiling HomaModule against vanilla kernel sources,
 executing the HomaModule unit tests, smoke testing the kernel module by loading
 it into a x86_64 QEMU guest with the applicable vanilla kernel the module was
 built against, and running the performance tests against NICs on baremetal
-hosts.
+hosts [1].
 
-Maybe this is useful to you too...
-
-> If you clone this repository: Ignore, or delete `TODO`. That's my personal
-> issue tracker for HomaModule related things...
+> If you clone this repository: Ignore, or delete `TODO`, after reading the
+> Changelog section in this `README`.
 
 1. initialize the `HomaModule.git/` submodule (e.g. 
    `git submodule update --init HomaModule.git`)
@@ -31,82 +27,28 @@ interest, which are any targets under `test-report/`, e.g.:
 Targets are grouped by kernel versions and suffixed with the checked out branch
 on the `HomaModule.git/` submodule, wherever applicable.
 
-## Disclosure
-
-1. Two kernel configs, because the module and the unit tests need opposite
-   things, so each version has two trees: `kernels/linux-<ver>` (smoke) and
-   `kernels/linux-<ver>-unit`.
-   - **module + smoke VM**: `make tinyconfig` + `kernel.smokeconfig`, a
-     *minimum viable config*, explicit and not drifting (defconfig drifts
-     between versions, tinyconfig doesn't), every option commented with why
-     the MODULE or the VM needs it (MEMCG, XFRM, NET_SCHED found the hard way
-     via modpost).
-   - **unit tests**: `make defconfig` + `kernel.unitconfig`. `test/mock.c`
-     overrides kernel functions that are only extern symbols under a
-     feature-rich config; under tinyconfig they are `static inline` and can't
-     be overridden. defconfig provides them (and matches upstream, whose
-     `test/Makefile` points `KDIR` at the running distro kernel). The only
-     option defconfig leaves off that Homa needs is MEMCG, so
-     `kernel.unitconfig` adds just that...
-
-2. The unit harness is currently coupled to the distro kernel it was written
-   for. a clean vanilla tree needs two nudges to link and run, both 
-   workbench-owned so the submodule stays pristine:
-   - **`preempt_schedule_thunk`** (and `_notrace`): the static-call default
-     targets `CONFIG_HAVE_STATIC_CALL_INLINE` pins as addressable symbols from
-     inlined `preempt_enable()`. `mock.c` stubs the trampoline but not these, so
-     `unit-mock-compat.c` is concatenated onto the *copy* of `mock.c` (the unit
-     recipe `rm`s the hardlink first, then `cat`s the original + shim, leaving
-     the submodule untouched). A `.patch` applied to the copy is probably a
-     bridge for future gaps that need an existing line changed rather than
-     added. I'm hoping though, that this won't ever be necessary...
-   - **NUMA MUST stay on.** `mock_cpu_to_node()` returns node 0 or 1, so
-     `homa_tx_pool_init()`'s `BUG_ON(numa >= MAX_NUMNODES)` needs
-     `MAX_NUMNODES >= 2`. defconfig's NUMA gives 64 *and* keeps x86's
-     `cpu_to_node` a macro, which is what lets `mock.h` redirect it to the
-     mock. Turning NUMA off breaks both (node 1 vs `MAX_NUMNODES==1`).
-
-3. The unit recipe rebuilds the test objects from scratch (`rm -rf` the test
-   build dir first). The copied `test/Makefile`'s dep tracking misses the
-   force-included `autoconf.h`, so reusing the dir across a config change would
-   relink stale objects against the old config. Make only runs the recipe when
-   a prerequisite actually changed, so the clean build isn't wasteful.
-
-4. `Module.symvers` is only complete after the kernel's built-in objects exist
-   (`make modules` alone compiles none), so the symvers rule runs
-   `vmlinux modules`. The bzImage (~1.8M under tinyconfig) has its own rule;
-   both share kbuild's object cache, so the second invocation is cheap.
-
-5. `test/unit` exits 0 even when tests fail; the unit rule greps the log's
-   verdict line instead. Failed runs leave
-   `test-report/<unit|smoke>/<ver>/<branch>.log.part`.
-
-6. tinyconfig has no ACPI poweroff: `initramfs.d/init` ends with `reboot -f` and
-   QEMU runs with `-no-reboot`, which turns the reset into a QEMU exit.
-
-7. `cp -al` hardlinks the submodule sources into `build/<ver>/<branch>/`, so
-   editors that replace files are handled by re-linking on every build.
-
-## Hacking
-
-Read the `Makefile`, that's it...
-
 ## Changelog
 
 Check out the issues related to the `Workbench` module in `TODO`, then
 cross-reference them with the trailing issue id of the merged branch mentioned
-in the message header of merge commits in the Git history.
+in the message header of merge commits in the Git history. No apparent changes?
+Then there are no changes, or a wicked rebase occured...
 
-## Recipes
+## Hacking
+
+Read the `Makefile` and hack away.
 
 > *run smoke tests for all registered kernel versions*
 
 ```sh
-make .list | grep "^test-report/unit/.*\.log"
+make .list \
+| grep "^test-report/unit/.*\.log" \
+| tr '\n' ' ' \
+| xargs make -j4
 ```
 
-> *build kernel images of all registered 6.x kernel versions, with 4 parallel
-> jobs...*
+> *build (smoke test) kernel images of all registered 6.x kernel versions, with
+> 4 parallel jobs...*
 
 ```sh
 make .list \
@@ -116,12 +58,12 @@ make .list \
 | xargs make -j4
 ```
 
-> *run a unit test matrix*
+> *run a unit test matrix against multiple HomaModule version pins (branches)*
 
 ```sh
 sh <<- 'EOF'
 	# NOTE: This runs test sequentially, with no shared make parent process...
-	# NOTE: brittle outer for-loop with default IFS for simplicity
+	# NOTE: brittle outer for-loop with default IFS for simplicity's sake
 	for x in $(cat <<- 'MATRIX'
 		linux_7.0:7.0.14
 		linux_6.13.9:6.10.6,6.13.9
@@ -137,3 +79,52 @@ sh <<- 'EOF'
 	done
 EOF
 ```
+
+## Disclosure
+
+1. There are two different kernel configs, because the smoke and unit tests need
+   opposite things. This sadly requires two separate kernel trees, so two
+   separate kernel builds.
+   - **smoke tests**: `make tinyconfig` + `kernel.smokeconfig`, sort of a
+     *minimum viable config*, which is trying to be explicit and not drifting
+     (tinyconfig doesn't drift between kernel versions). Also note that trees
+     for smoke testing aren't explicitly labelled as such, since I'll probably
+     reuse these kernel for other purposes at some other point in time.
+   - **unit tests**: `make defconfig` + `kernel.unitconfig`. 
+     `HomaModule.git/test/mock.c` overides kernel functions that are only 
+     `extern` symbols under more complex configs. Under tinyconfig they are
+     `static inline` and can't be overridden.
+
+2. The HomaModule test harness is currently coupled to the distro kernel it was
+   written for, which require two:
+   - **stubs**: `mock.c` does not two functions under the assertions that builds
+     happen under common kernel build defaults (which I deviate from with my
+     *minimum viable config* approach), so `unit-mock-compat.c` is concatenated
+     onto the *copy* of `mock.c`, acting as a stop-gap.
+   - **NUMA kernel config MUST stay on!!**: Messing with it breaks
+     `homa_tx_pool_init()`. I'll have to revisit this to explain it properly,
+     sorry...
+
+3. The copied `test/Makefile`'s dep tracking misses the force-included
+   `autoconf.h`, so a kernel-config change would relink stale objects against
+   the old config. The unit Makefile recipe therefore wipes the test objects
+   only when `autoconf.h` is newer than the last-built `unit` binary (config
+   change).
+
+4. `Module.symvers` is only complete after the kernel's built-in objects exist
+   (`make modules` alone compiles nothing...), so the symvers rule runs `vmlinux
+   modules`. The bzImage therefore has its own rule. Since both builds share
+   kbuild's object cache, the second invocation is cheap...
+
+5. `test/unit` binary exits 0 even when tests fail. The Makefile recipe greps
+   the log's sentinel line instead.
+
+6. tinyconfig has no ACPI poweroff: `initramfs.d/init` ends with `reboot -f` and
+   QEMU runs with `-no-reboot`, which turns the reset into a QEMU exit.
+
+7. `cp -al` hardlinks the submodule sources into `build/<ver>/<branch>/`, so
+   edits that replace files are handled by relinking on every build.
+
+[1] I haven't implemented this yet... I've been (trying) to evaluate NICs by
+    hairpinning with MACVLAN VEPA but the NIC wedges and I get inconsistent 
+    results applying the test methods as layed out by the HomaModule repository.

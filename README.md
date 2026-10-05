@@ -27,6 +27,15 @@ interest, which are any targets under `test-report/`, e.g.:
 Targets are grouped by kernel versions and suffixed with the checked out branch
 on the `HomaModule.git/` submodule, wherever applicable.
 
+The test bench also provides a Docker harness.
+
+Run `sh ./configure --with-docker-gcc=<gcc-version>`, to build a Docker image.
+The GNU Autoconf script will output an example for a `docker run` command.
+
+> Docker bind mounts can mess up the filesystem state of the repository, when
+> switching between building in a Docker container and locally. Run `make
+> .clean-squeaky` prior to switching, to reset the repository to a clean state.
+
 ## Changelog
 
 Check out the issues related to the `Workbench` module in `TODO`, then

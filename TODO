@@ -39,3 +39,17 @@ Module: Workbench
 Relationships: 
 Description: add a Docker harness to execute all make calls in a reproducible
              dev environment
+
+--ISSUE
+Content-Type: application/issue
+ID: 3
+Type: bugfix
+Title: stop propagating -B flag in make
+Status: open
+Priority: high
+Created: 2026-10-05
+Module: Workbench
+Relationships: 
+Description: stop make from propagating -B flag into nested make calls on
+             HomaModule.git. This is an issue inside the test harness when
+             building the kernel itself, since it forces a rebuild of everything

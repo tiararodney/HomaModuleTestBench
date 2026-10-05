@@ -47,4 +47,30 @@ AS_IF([test -n "$vm_missing"],
 AS_IF([test -n "$missing"],
       [AC_MSG_ERROR([something will fail!  missing required prerequisites:$missing])])
 AC_MSG_NOTICE([all required prerequisites found])
+
+AC_ARG_WITH([docker-gcc],
+  [AS_HELP_STRING([--with-docker-gcc=VERSION],
+    [print Docker build/run commands for GCC VERSION (available: ]m4_esyscmd_s(
+     [grep GCC_TARGET Dockerfile.m4 2>/dev/null | tr -cd '0-9\n' | tr '\n' ' '])[)])])
+
+AS_IF([test -n "$with_docker_gcc"],
+  [docker_gcc_avail=$(grep GCC_TARGET "$srcdir/Dockerfile.m4" | tr -cd '0-9\n' | tr '\n' ' ')
+   AS_CASE([" $docker_gcc_avail"],
+     [*" $with_docker_gcc "*], [],
+     [AC_MSG_ERROR([gcc-$with_docker_gcc not in Dockerfile.m4; available:$docker_gcc_avail])])
+   AC_MSG_CHECKING([for docker buildx])
+   AS_IF([docker buildx version >/dev/null 2>&1],
+     [AC_MSG_RESULT([yes])],
+     [AC_MSG_RESULT([no])
+      AC_MSG_ERROR([docker buildx is required for --with-docker-gcc])])])
+
+AC_CONFIG_COMMANDS([Dockerfile],
+  [m4 "$srcdir/Dockerfile.m4" > Dockerfile
+   if test -n "$docker_gcc"; then
+     docker buildx build --target "gcc-$docker_gcc" -t "homa-gcc$docker_gcc" .
+     echo ""
+     echo '  docker run --rm -v $(pwd):/src homa-gcc'"$docker_gcc"' make'
+     echo ""
+   fi],
+  [docker_gcc=$with_docker_gcc])
 AC_OUTPUT

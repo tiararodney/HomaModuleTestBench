@@ -32,7 +32,7 @@ Content-Type: application/issue
 ID: 2
 Type: feature
 Title: Docker devel harness
-Status: in-progress
+Status: done
 Priority: high
 Created: 2026-10-05
 Module: Workbench

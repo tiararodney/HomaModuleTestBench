@@ -33,6 +33,11 @@ QEMU_KVM := $(shell test -w /dev/kvm && echo -enable-kvm -cpu host)
 
 NPROC := $(shell nproc)
 
+# -B (always-make) breaks kernel sub-makes, which cannot
+# force-rebuild .config.  Strip it so only the outer make
+# sees -B; sub-makes follow normal dependency timestamps.
+override MAKEFLAGS := $(subst B,,$(firstword $(MAKEFLAGS))) $(wordlist 2,$(words $(MAKEFLAGS)),$(MAKEFLAGS))
+
 # v6.x/v7.x directory on kernel.org, derived from the version stem
 series = v$(firstword $(subst ., ,$(1))).x
 

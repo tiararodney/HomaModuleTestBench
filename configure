@@ -1336,8 +1336,8 @@ Optional Packages:
   --with-PACKAGE[=ARG]    use PACKAGE [ARG=yes]
   --without-PACKAGE       do not use PACKAGE (same as --with-PACKAGE=no)
   --with-docker-gcc=VERSION
-                          print Docker build/run commands for GCC VERSION
-                          (available: 13 14 15 16 )
+                          build inside Docker with GCC VERSION (available: 13
+                          14 15 16 )
 
 Some influential environment variables:
   CC          C compiler command
@@ -2507,6 +2507,37 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
+
+
+# Check whether --with-docker-gcc was given.
+if test ${with_docker_gcc+y}
+then :
+  withval=$with_docker_gcc;
+fi
+
+
+if test -n "$with_docker_gcc"
+then :
+  docker_gcc_avail=$(grep GCC_TARGET "$srcdir/Dockerfile.m4" | tr -cd '0-9\n' | tr '\n' ' ')
+   case " $docker_gcc_avail" in #(
+  *" $with_docker_gcc "*) :
+     ;; #(
+  *) :
+    as_fn_error $? "gcc-$with_docker_gcc not in Dockerfile.m4; available:$docker_gcc_avail" "$LINENO" 5 ;;
+esac
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for docker buildx" >&5
+printf %s "checking for docker buildx... " >&6; }
+   if docker buildx version >/dev/null 2>&1
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
+printf "%s\n" "yes" >&6; }
+else case e in #(
+  e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+printf "%s\n" "no" >&6; }
+      as_fn_error $? "docker buildx is required for --with-docker-gcc" "$LINENO" 5 ;;
+esac
+fi
+fi
 
 missing=
 
@@ -4674,40 +4705,19 @@ printf "%s\n" "$as_me: WARNING: smoke tests will fail! missing:$vm_missing" >&2;
 fi
 if test -n "$missing"
 then :
-  as_fn_error $? "something will fail!  missing required prerequisites:$missing" "$LINENO" 5
-fi
-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: all required prerequisites found" >&5
-printf "%s\n" "$as_me: all required prerequisites found" >&6;}
-
-
-# Check whether --with-docker-gcc was given.
-if test ${with_docker_gcc+y}
+  if test -n "$with_docker_gcc"
 then :
-  withval=$with_docker_gcc;
-fi
-
-
-if test -n "$with_docker_gcc"
-then :
-  docker_gcc_avail=$(grep GCC_TARGET "$srcdir/Dockerfile.m4" | tr -cd '0-9\n' | tr '\n' ' ')
-   case " $docker_gcc_avail" in #(
-  *" $with_docker_gcc "*) :
-     ;; #(
-  *) :
-    as_fn_error $? "gcc-$with_docker_gcc not in Dockerfile.m4; available:$docker_gcc_avail" "$LINENO" 5 ;;
-esac
-   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for docker buildx" >&5
-printf %s "checking for docker buildx... " >&6; }
-   if docker buildx version >/dev/null 2>&1
-then :
-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: yes" >&5
-printf "%s\n" "yes" >&6; }
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: WARNING: host is missing:$missing (not required for --with-docker-gcc)" >&5
+printf "%s\n" "$as_me: WARNING: host is missing:$missing (not required for --with-docker-gcc)" >&2;}
 else case e in #(
-  e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
-printf "%s\n" "no" >&6; }
-      as_fn_error $? "docker buildx is required for --with-docker-gcc" "$LINENO" 5 ;;
+  e) as_fn_error $? "something will fail!  missing required prerequisites:$missing" "$LINENO" 5 ;;
 esac
 fi
+fi
+if test -z "$missing"
+then :
+  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: all required prerequisites found" >&5
+printf "%s\n" "$as_me: all required prerequisites found" >&6;}
 fi
 
 ac_config_commands="$ac_config_commands Dockerfile"

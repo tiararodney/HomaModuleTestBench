@@ -59,7 +59,7 @@ Content-Type: application/issue
 ID: 4
 Type: feature
 Title: configure: soften host prerequisites when --with-docker-gcc is used
-Status: open
+Status: in-progress
 Priority: medium
 Created: 2026-10-05
 Relationships: 

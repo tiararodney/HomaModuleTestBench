@@ -89,6 +89,39 @@ sh <<- 'EOF'
 EOF
 ```
 
+> *provide an idempotent (battery-included) script for reproducibility*.
+> 
+> Creates a temporary working directory, clones the test bench, checks out a
+> certain HomaModule.git/ ref, executes some things, then cleans up after
+> itself. The script can be pasted directly into a POSIX shell (no bash-isms).
+
+```sh
+sh -ex <<'EOF'
+WORKDIR="$(mktemp -d)"
+KERNEL_VERSION=7.0.14
+COMMIT=0815fe9
+
+finally() {
+    rm -rf "$WORKDIR"
+}
+trap finally EXIT
+
+git clone https://github.com/tiararodney/HomaModuleTestBench.git "$WORKDIR"
+cd "$WORKDIR"
+git submodule update --init HomaModule.git/
+
+# NOTE: this is to point to a fork, e.g. during a merge request...
+git -C HomaModule.git/ remote set-url origin https://github.com/tiararodney/HomaModule.git
+git -C HomaModule.git/ fetch origin linux-v619
+git -C HomaModule.git/ checkout "$COMMIT"
+
+sh ./configure --with-docker-gcc=15
+
+# NOTE: implement something here, e.g.
+# docker run --rm -v "$PWD):/src homa-gcc15 make test-report/$KERNEL_VERSION/$COMMIT.log
+EOF
+```
+
 ## Disclosure
 
 1. There are two different kernel configs, because the smoke and unit tests need

@@ -134,6 +134,15 @@ EOF
 7. `cp -al` hardlinks the submodule sources into `build/<ver>/<branch>/`, so
    edits that replace files are handled by relinking on every build.
 
+8. I'm developing on Ubuntu, so in areas where the distro truly matters to the
+   build toolchain, I might have leaked in some opinions... Just extend
+   `Dockerfile.m4` to include the distro that matters and update `configure.ac`
+   so that the `--with-docker-gcc` can take a version qualifier that
+   additionally qualifies the distro (e.g. `--with-docker-gcc=15-alpine`).
+
+9. Support for cross-compilation is still on my mind, though admittedly, I
+   haven't tried cross-compiling yet and the harness has no interface to do so.
+
 [1] I haven't implemented this yet... I've been (trying) to evaluate NICs by
     hairpinning with MACVLAN VEPA but the NIC wedges and I get inconsistent 
     results applying the test methods as layed out by the HomaModule repository.

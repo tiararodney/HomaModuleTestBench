@@ -45,7 +45,7 @@ Content-Type: application/issue
 ID: 3
 Type: bugfix
 Title: stop propagating -B flag in make
-Status: open
+Status: in-progress
 Priority: high
 Created: 2026-10-05
 Module: Workbench

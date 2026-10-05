@@ -53,3 +53,19 @@ Relationships:
 Description: stop make from propagating -B flag into nested make calls on
              HomaModule.git. This is an issue inside the test harness when
              building the kernel itself, since it forces a rebuild of everything
+
+--ISSUE
+Content-Type: application/issue
+ID: 4
+Type: feature
+Title: configure: soften host prerequisites when --with-docker-gcc is used
+Status: open
+Priority: medium
+Created: 2026-10-05
+Relationships: 
+Description: When --with-docker-gcc is given, the build runs inside Docker, so
+             host-side prerequisites (gcc, make, perl, libelf-dev, libssl-dev,
+             etc.) are not required. Change configure.ac so that these checks
+             emit warnings instead of hard errors when --with-docker-gcc is
+             active. Only docker buildx should remain a hard prerequisite in
+             that path.

@@ -122,7 +122,7 @@ git -C HomaModule.git/ checkout "$COMMIT"
 sh ./configure --with-docker-gcc=15
 
 # NOTE: implement something here, e.g.
-# docker run --rm -v "$PWD):/src homa-gcc15 make test-report/$KERNEL_VERSION/$COMMIT.log
+# docker run --rm -v "$PWD":/src homa-gcc15 make test-report/$KERNEL_VERSION/$COMMIT.log
 EOF
 ```
 

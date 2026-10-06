@@ -11,11 +11,15 @@ hosts [1].
 > If you clone this repository: Ignore, or delete `TODO`, after reading the
 > Changelog section in this `README`.
 
+---
+
 1. initialize the `HomaModule.git/` submodule (e.g. 
    `git submodule update --init HomaModule.git`)
 2. run the GNU Autoconf script with `sh ./configure` and fix up prerequisites,
    until the script's exit code is `0` (`echo $?`).
 3. use GNU Make `make` tab-completion or `make .list` to find targets.
+
+---
 
 All GNU Make targets are sentinel targets (except for two phonies), so there are
 no hidden states, though for normal usage only the leaf sentinel targets are of
